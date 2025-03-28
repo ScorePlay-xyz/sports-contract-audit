@@ -72,6 +72,11 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
     event FeesWithdrawn(address indexed owner, uint256 amount);
     event OracleChanged(address indexed oldOracle, address indexed newOracle);
     event HouseFeeChanged(uint256 oldFee, uint256 newFee);
+    event ConditionEndTimeUpdated(
+        bytes32 indexed matchId,
+        uint256 oldEndTime,
+        uint256 newEndTime
+    );
 
     modifier onlyOracle() {
         if (msg.sender != oracle) revert InvalidAddress();
@@ -266,6 +271,24 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         if (!success) revert();
 
         emit FeesWithdrawn(owner(), feesToWithdraw);
+    }
+
+    /// @notice Updates the end time for a betting condition
+    /// @param matchId The match identifier
+    /// @param newEndTime New timestamp after which betting is no longer allowed
+    function updateConditionEndTime(
+        bytes32 matchId,
+        uint256 newEndTime
+    ) external onlyOracle {
+        Condition storage condition = conditions[matchId];
+        if (condition.matchId == bytes32(0)) revert ConditionNotFound();
+        if (condition.resolved) revert ConditionAlreadyResolved();
+        if (newEndTime <= block.timestamp) revert BettingPeriodEnded();
+
+        uint256 oldEndTime = condition.endTime;
+        condition.endTime = newEndTime;
+
+        emit ConditionEndTimeUpdated(matchId, oldEndTime, newEndTime);
     }
 
     /// @notice Returns the total bet a user placed on a specific outcome for a given matchId
