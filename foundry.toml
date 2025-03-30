@@ -4,3 +4,16 @@ out = "out"
 libs = ["lib"]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+
+[rpc_endpoints]
+basecamp = "https://rpc.basecamp.t.raas.gelato.cloud"
+
+[etherscan]
+basecamp = { key = "", url = "https://basecamp.cloud.blockscout.com/api" }
+
+[profile.networks]
+[profile.networks.basecamp]
+rpc_url = "https://rpc.basecamp.t.raas.gelato.cloud"
+chain_id = 123420001114
+verifier = "blockscout"
+verifier_url = "https://basecamp.cloud.blockscout.com/api"
