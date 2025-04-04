@@ -6,11 +6,13 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 // import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title Enhanced Sports Prediction Contract
 /// @notice Allows users to place bets on sports events with customizable outcomes
 /// @dev Implements security features like ReentrancyGuard and Ownable
 contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
     IERC20 public collateralToken;
     address public oracle;
     uint256 public houseFee;
@@ -134,12 +136,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         if (block.timestamp >= condition.endTime) revert BettingPeriodEnded();
         if (amount == 0) revert InvalidBetAmount();
 
-        bool success = collateralToken.transferFrom(
-            msg.sender,
-            address(this),
-            amount
-        );
-        if (!success) revert();
+        collateralToken.safeTransferFrom(msg.sender, address(this), amount);
 
         condition.outcomeBets[outcome] += amount;
         condition.userBets[msg.sender][outcome] += amount;
@@ -209,8 +206,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         condition.hasClaimed[msg.sender] = true;
         condition.claimedAmounts[msg.sender] = payout;
 
-        bool success = collateralToken.transfer(msg.sender, payout);
-        if (!success) revert();
+        collateralToken.safeTransfer(msg.sender, payout);
 
         // Track payout
         userPayouts[msg.sender].push(matchId);
@@ -267,8 +263,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         uint256 feesToWithdraw = totalFeesCollected;
         totalFeesCollected = 0;
 
-        bool success = collateralToken.transfer(owner(), feesToWithdraw);
-        if (!success) revert();
+        collateralToken.safeTransfer(owner(), feesToWithdraw);
 
         emit FeesWithdrawn(owner(), feesToWithdraw);
     }
