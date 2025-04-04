@@ -31,6 +31,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
     error InvalidFee();
     error NoFeesToWithdraw();
     error InvalidOutcome();
+    error CurrentPeriodEnded();
     // error BettingPeriodNotEnded();
     error AlreadyClaimed();
 
@@ -283,6 +284,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         Condition storage condition = conditions[matchId];
         if (condition.matchId == bytes32(0)) revert ConditionNotFound();
         if (condition.resolved) revert ConditionAlreadyResolved();
+        if (block.timestamp >= condition.endTime) revert CurrentPeriodEnded();
         if (newEndTime <= block.timestamp) revert BettingPeriodEnded();
 
         uint256 oldEndTime = condition.endTime;
