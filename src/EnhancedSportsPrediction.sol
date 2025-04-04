@@ -40,6 +40,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         uint256 winningOutcome;
         uint256 totalPool;
         uint256 endTime;
+        uint256 houseFee; // Add houseFee field
         mapping(uint256 => uint256) outcomeBets;
         mapping(address => mapping(uint256 => uint256)) userBets;
         mapping(address => bool) hasClaimed;
@@ -115,6 +116,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         Condition storage newCondition = conditions[matchId];
         newCondition.matchId = matchId;
         newCondition.endTime = endTime;
+        newCondition.houseFee = houseFee; // Store current houseFee
 
         emit ConditionCreated(matchId, endTime);
     }
@@ -175,7 +177,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         condition.resolved = true;
         condition.winningOutcome = winningOutcome;
 
-        uint256 houseCut = (condition.totalPool * houseFee) / FEE_DENOMINATOR;
+        uint256 houseCut = (condition.totalPool * condition.houseFee) / FEE_DENOMINATOR;
         totalFeesCollected += houseCut;
 
         emit ConditionResolved(matchId, winningOutcome);
@@ -197,7 +199,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         uint256 conditionTotalPool = condition.totalPool;
         if (conditionTotalPool == 0) revert EmptyPool();
 
-        uint256 houseCut = (conditionTotalPool * houseFee) / FEE_DENOMINATOR;
+        uint256 houseCut = (conditionTotalPool * condition.houseFee) / FEE_DENOMINATOR;
         uint256 payoutPool = conditionTotalPool - houseCut;
 
         uint256 outcomePool = condition.outcomeBets[condition.winningOutcome];
