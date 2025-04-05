@@ -134,13 +134,6 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         if (block.timestamp >= condition.endTime) revert BettingPeriodEnded();
         if (amount == 0) revert InvalidBetAmount();
 
-        bool success = collateralToken.transferFrom(
-            msg.sender,
-            address(this),
-            amount
-        );
-        if (!success) revert();
-
         condition.outcomeBets[outcome] += amount;
         condition.userBets[msg.sender][outcome] += amount;
         condition.totalPool += amount;
@@ -158,6 +151,13 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
             amount,
             condition.totalPool
         );
+
+        bool success = collateralToken.transferFrom(
+            msg.sender,
+            address(this),
+            amount
+        );
+        if (!success) revert();
     }
 
     /// @notice Resolves a condition with a winning outcome
@@ -205,17 +205,15 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
 
         uint256 payout = (userBet * payoutPool) / outcomePool;
 
-        // Update claim status and amount before transfer
+        // Update claim status, amount and payouts before transfer
         condition.hasClaimed[msg.sender] = true;
         condition.claimedAmounts[msg.sender] = payout;
-
-        bool success = collateralToken.transfer(msg.sender, payout);
-        if (!success) revert();
-
-        // Track payout
         userPayouts[msg.sender].push(matchId);
 
         emit PayoutClaimed(msg.sender, matchId, payout);
+
+        bool success = collateralToken.transfer(msg.sender, payout);
+        if (!success) revert();
     }
 
     /// @notice Calculates the current odds for a specific outcome
