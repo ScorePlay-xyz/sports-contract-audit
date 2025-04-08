@@ -209,6 +209,9 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
 
         uint256 outcomePool = condition.outcomeBets[condition.winningOutcome];
 
+        // If no bets were placed on the winning outcome, return early
+        if (outcomePool == 0) return;
+
         uint256 payout = (userBet * payoutPool) / outcomePool;
 
         // Update claim status and amount before transfer
