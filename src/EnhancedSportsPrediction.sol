@@ -34,7 +34,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
     error NoFeesToWithdraw();
     error InvalidOutcome();
     error CurrentPeriodEnded();
-    // error BettingPeriodNotEnded();
+    error BettingPeriodNotEnded();
     error AlreadyClaimed();
 
     struct Condition {
@@ -181,12 +181,13 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         Condition storage condition = conditions[matchId];
         if (condition.matchId == bytes32(0)) revert ConditionNotFound();
         if (condition.resolved) revert ConditionAlreadyResolved();
-        // if (block.timestamp < condition.endTime) revert BettingPeriodNotEnded();
+        if (block.timestamp < condition.endTime) revert BettingPeriodNotEnded();
 
         condition.resolved = true;
         condition.winningOutcome = winningOutcome;
 
-        uint256 houseCut = (condition.totalPool * condition.houseFee) / FEE_DENOMINATOR;
+        uint256 houseCut = (condition.totalPool * condition.houseFee) /
+            FEE_DENOMINATOR;
         totalFeesCollected += houseCut;
 
         emit ConditionResolved(matchId, winningOutcome);
@@ -208,7 +209,8 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         uint256 conditionTotalPool = condition.totalPool;
         if (conditionTotalPool == 0) revert EmptyPool();
 
-        uint256 houseCut = (conditionTotalPool * condition.houseFee) / FEE_DENOMINATOR;
+        uint256 houseCut = (conditionTotalPool * condition.houseFee) /
+            FEE_DENOMINATOR;
         uint256 payoutPool = conditionTotalPool - houseCut;
 
         uint256 outcomePool = condition.outcomeBets[condition.winningOutcome];
