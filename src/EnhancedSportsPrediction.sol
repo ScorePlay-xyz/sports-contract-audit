@@ -331,7 +331,72 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
             !condition.hasClaimed[user]);
     }
 
-    /// @notice Get all matches a user has participated in
+    /// @notice Get all matches a user has participated in (paginated version)
+    /// @param user The user address
+    /// @param offset Starting index in the array
+    /// @param limit Maximum number of items to return
+    /// @return matches Array of matchIds the user has bet on
+    /// @return total Total number of matches for the user
+    function getUserMatches(
+        address user,
+        uint256 offset,
+        uint256 limit
+    ) external view returns (bytes32[] memory matches, uint256 total) {
+        bytes32[] storage allMatches = userMatches[user];
+        total = allMatches.length;
+
+        if (offset >= total || limit == 0) {
+            return (new bytes32[](0), total);
+        }
+
+        uint256 end = offset + limit;
+        if (end > total) {
+            end = total;
+        }
+        uint256 resultLength = end - offset;
+        
+        matches = new bytes32[](resultLength);
+        for (uint256 i = 0; i < resultLength; i++) {
+            matches[i] = allMatches[offset + i];
+        }
+
+        return (matches, total);
+    }
+
+    /// @notice Get all matches a user has claimed payouts for (paginated version)
+    /// @param user The user address
+    /// @param offset Starting index in the array
+    /// @param limit Maximum number of items to return
+    /// @return payouts Array of matchIds the user has received payouts for
+    /// @return total Total number of payouts for the user
+    function getUserPayouts(
+        address user,
+        uint256 offset,
+        uint256 limit
+    ) external view returns (bytes32[] memory payouts, uint256 total) {
+        bytes32[] storage allPayouts = userPayouts[user];
+        total = allPayouts.length;
+
+        if (offset >= total || limit == 0) {
+            return (new bytes32[](0), total);
+        }
+
+        uint256 end = offset + limit;
+        if (end > total) {
+            end = total;
+        }
+        uint256 resultLength = end - offset;
+        
+        payouts = new bytes32[](resultLength);
+        for (uint256 i = 0; i < resultLength; i++) {
+            payouts[i] = allPayouts[offset + i];
+        }
+
+        return (payouts, total);
+    }
+
+    // Keep the original functions but mark them as deprecated
+    /// @notice Get all matches a user has participated in (deprecated - use paginated version)
     /// @param user The user address
     /// @return Array of matchIds the user has bet on
     function getUserMatches(
@@ -340,7 +405,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         return userMatches[user];
     }
 
-    /// @notice Get all matches a user has claimed payouts for
+    /// @notice Get all matches a user has claimed payouts for (deprecated - use paginated version)
     /// @param user The user address
     /// @return Array of matchIds the user has received payouts for
     function getUserPayouts(
