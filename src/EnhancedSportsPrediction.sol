@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 /// @notice Allows users to place bets on sports events with customizable outcomes
 /// @dev Implements security features like ReentrancyGuard and Ownable
 contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
-    IERC20 public collateralToken;
+    IERC20 public immutable collateralToken;
     address public oracle;
     uint256 public houseFee;
     uint256 public constant FEE_DENOMINATOR = 100;
