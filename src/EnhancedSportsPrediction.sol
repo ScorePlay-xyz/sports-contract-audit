@@ -44,6 +44,8 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         uint256 totalPool;
         uint256 endTime;
         uint256 houseFee; // Add houseFee field
+        uint256 minOutcome;
+        uint256 maxOutcome;
         mapping(uint256 => uint256) outcomeBets;
         mapping(address => mapping(uint256 => uint256)) userBets;
         mapping(address => bool) hasClaimed;
@@ -108,18 +110,25 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
     /// @notice Creates a new betting condition
     /// @param matchId Unique identifier for the match
     /// @param endTime Timestamp after which betting is no longer allowed
+    /// @param minOutcome Minimum valid outcome
+    /// @param maxOutcome Maximum valid outcome
     function createCondition(
         bytes32 matchId,
-        uint256 endTime
+        uint256 endTime,
+        uint256 minOutcome,
+        uint256 maxOutcome
     ) external onlyOracle {
         if (conditions[matchId].matchId != bytes32(0))
             revert ConditionAlreadyExists();
         if (endTime <= block.timestamp) revert BettingPeriodEnded();
+        if (minOutcome > maxOutcome) revert InvalidOutcome();
 
         Condition storage newCondition = conditions[matchId];
         newCondition.matchId = matchId;
         newCondition.endTime = endTime;
         newCondition.houseFee = houseFee; // Store current houseFee
+        newCondition.minOutcome = minOutcome;
+        newCondition.maxOutcome = maxOutcome;
 
         emit ConditionCreated(matchId, endTime);
     }
@@ -138,6 +147,8 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         if (condition.resolved) revert ConditionAlreadyResolved();
         if (block.timestamp >= condition.endTime) revert BettingPeriodEnded();
         if (amount == 0) revert InvalidBetAmount();
+        if (outcome < condition.minOutcome || outcome > condition.maxOutcome)
+            revert InvalidOutcome();
 
         condition.outcomeBets[outcome] += amount;
         condition.userBets[msg.sender][outcome] += amount;
