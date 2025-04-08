@@ -108,8 +108,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         bytes32 matchId,
         uint256 endTime
     ) external onlyOracle {
-        if (conditions[matchId].endTime != 0)
-            revert ConditionAlreadyExists();
+        if (conditions[matchId].endTime != 0) revert ConditionAlreadyExists();
         if (endTime <= block.timestamp) revert BettingPeriodEnded();
 
         Condition storage newCondition = conditions[matchId];
@@ -129,7 +128,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         uint256 amount
     ) external nonReentrant {
         Condition storage condition = conditions[matchId];
-        if (condition.matchId == bytes32(0)) revert ConditionNotFound();
+        if (condition.endTime != 0) revert ConditionNotFound();
         if (condition.resolved) revert ConditionAlreadyResolved();
         if (block.timestamp >= condition.endTime) revert BettingPeriodEnded();
         if (amount == 0) revert InvalidBetAmount();
@@ -168,7 +167,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         uint256 winningOutcome
     ) external onlyOracle {
         Condition storage condition = conditions[matchId];
-        if (condition.matchId == bytes32(0)) revert ConditionNotFound();
+        if (condition.endTime != 0) revert ConditionNotFound();
         if (condition.resolved) revert ConditionAlreadyResolved();
         // if (block.timestamp < condition.endTime) revert BettingPeriodNotEnded();
 
@@ -227,7 +226,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         uint256 outcome
     ) external view returns (uint256) {
         Condition storage condition = conditions[matchId];
-        if (condition.matchId == bytes32(0)) revert ConditionNotFound();
+        if (condition.endTime != 0) revert ConditionNotFound();
 
         uint256 totalPool = condition.totalPool;
         uint256 outcomePool = condition.outcomeBets[outcome];
@@ -281,7 +280,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         uint256 newEndTime
     ) external onlyOracle {
         Condition storage condition = conditions[matchId];
-        if (condition.matchId == bytes32(0)) revert ConditionNotFound();
+        if (condition.endTime != 0) revert ConditionNotFound();
         if (condition.resolved) revert ConditionAlreadyResolved();
         if (newEndTime <= block.timestamp) revert BettingPeriodEnded();
 
