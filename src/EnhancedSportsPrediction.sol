@@ -18,6 +18,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
     uint256 public houseFee;
     uint256 public constant FEE_DENOMINATOR = 100;
     uint256 public totalFeesCollected;
+    uint256 public totalBettingVolume;
 
     // Custom errors to save gas
     error ConditionAlreadyExists();
@@ -153,6 +154,8 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         condition.outcomeBets[outcome] += amount;
         condition.userBets[msg.sender][outcome] += amount;
         condition.totalPool += amount;
+
+        totalBettingVolume += amount;
 
         // Track user participation if not already tracked
         if (!userParticipated[msg.sender][matchId]) {
@@ -467,5 +470,11 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
     ) external view returns (bool claimed, uint256 amount) {
         Condition storage condition = conditions[matchId];
         return (condition.hasClaimed[user], condition.claimedAmounts[user]);
+    }
+
+    /// @notice Returns the total betting volume across all conditions
+    /// @return The total betting volume
+    function getTotalBettingVolume() external view returns (uint256) {
+        return totalBettingVolume;
     }
 }
