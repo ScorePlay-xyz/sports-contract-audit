@@ -189,6 +189,14 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         uint256 houseCut = (condition.totalPool * condition.houseFee) /
             FEE_DENOMINATOR;
         totalFeesCollected += houseCut;
+        uint256 winningPool = condition.outcomeBets[winningOutcome];
+
+        // If no one bet on the winning outcome, add remaining funds to house fees
+        if (winningPool == 0) {
+            totalFeesCollected += condition.totalPool;
+        } else {
+            totalFeesCollected += houseCut;
+        }
 
         emit ConditionResolved(matchId, winningOutcome);
         emit HouseFeeCollected(matchId, houseCut);
@@ -214,7 +222,9 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         uint256 payoutPool = conditionTotalPool - houseCut;
 
         uint256 outcomePool = condition.outcomeBets[condition.winningOutcome];
-        if (outcomePool == 0) revert NoBetsOnOutcome();
+
+        // If no bets were placed on the winning outcome, return early
+        if (outcomePool == 0) return;
 
         uint256 payout = (userBet * payoutPool) / outcomePool;
 
