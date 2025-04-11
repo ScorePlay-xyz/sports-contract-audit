@@ -108,7 +108,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         bytes32 matchId,
         uint256 endTime
     ) external onlyOracle {
-        if (conditions[matchId].endTime == 0) revert ConditionAlreadyExists();
+        if (conditions[matchId].endTime != 0) revert ConditionAlreadyExists();
         if (endTime <= block.timestamp) revert BettingPeriodEnded();
 
         Condition storage newCondition = conditions[matchId];
