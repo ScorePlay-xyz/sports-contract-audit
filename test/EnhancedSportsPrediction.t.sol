@@ -66,6 +66,7 @@ contract EnhancedSportsPredictionTest is Test {
         (
             bytes32 matchId,
             bool resolved,
+            bool closed,
             uint256 winningOutcome,
             uint256 totalPool,
             uint256 retrievedEndTime
@@ -128,5 +129,151 @@ contract EnhancedSportsPredictionTest is Test {
         );
         assertTrue(claimed);
         assertTrue(amount > 0);
+    }
+
+    function test_UpdateConditionEndTime() public {
+        // Create condition
+        uint256 endTime = block.timestamp + 1 days;
+        vm.prank(oracle);
+        prediction.createCondition(TEST_MATCH_ID, endTime);
+
+        // Update end time
+        uint256 newEndTime = block.timestamp + 2 days;
+        vm.prank(oracle);
+        prediction.updateConditionEndTime(TEST_MATCH_ID, newEndTime);
+
+        // Check if the end time was updated
+        (bytes32 matchId, , , , , uint256 retrievedEndTime) = prediction
+            .conditions(TEST_MATCH_ID);
+        assertEq(retrievedEndTime, newEndTime);
+        assertEq(matchId, TEST_MATCH_ID);
+    }
+
+    function test_CloseConditionAndRefund() public {
+        // Create condition
+        uint256 endTime = block.timestamp + 1 days;
+        vm.prank(oracle);
+        prediction.createCondition(TEST_MATCH_ID, endTime);
+
+        // Place bets from both users
+        vm.prank(user1);
+        prediction.placeBet(TEST_MATCH_ID, 1, BET_AMOUNT);
+
+        vm.prank(user2);
+        prediction.placeBet(TEST_MATCH_ID, 2, BET_AMOUNT);
+
+        // Record balance before
+        uint256 user1BalanceBefore = token.balanceOf(user1);
+
+        // Close the condition (e.g., match canceled)
+        vm.prank(oracle);
+        prediction.closeCondition(TEST_MATCH_ID);
+
+        // Check if condition is marked as closed
+        assertTrue(prediction.isConditionClosed(TEST_MATCH_ID));
+
+        // Check if user can claim refund
+        bool refundable = prediction.getRefundable(TEST_MATCH_ID, user1);
+        assertTrue(refundable, "User should be able to claim refund");
+
+        // Claim refund
+        vm.prank(user1);
+        prediction.claimRefund(TEST_MATCH_ID);
+
+        // Verify user received their bet amount back
+        uint256 user1BalanceAfter = token.balanceOf(user1);
+        assertEq(
+            user1BalanceAfter,
+            user1BalanceBefore + BET_AMOUNT,
+            "User should receive full refund"
+        );
+
+        // Verify refund was processed
+        uint256 refundAmount = prediction.getUserRefund(TEST_MATCH_ID, user1);
+        assertEq(
+            refundAmount,
+            BET_AMOUNT,
+            "Refund amount should match bet amount"
+        );
+
+        // Verify user can't claim twice
+        vm.expectRevert();
+        vm.prank(user1);
+        prediction.claimRefund(TEST_MATCH_ID);
+    }
+
+    function test_MultipleCloseConditionAndRefund() public {
+        // Create condition
+        uint256 endTime = block.timestamp + 1 days;
+        vm.prank(oracle);
+        prediction.createCondition(TEST_MATCH_ID, endTime);
+
+        // Place multiple bets from user1 on different outcomes (3 different outcomes)
+        vm.prank(user1);
+        prediction.placeBet(TEST_MATCH_ID, 1, BET_AMOUNT / 4);
+        
+        vm.prank(user1);
+        prediction.placeBet(TEST_MATCH_ID, 2, BET_AMOUNT / 4);
+        
+        vm.prank(user1);
+        prediction.placeBet(TEST_MATCH_ID, 3, BET_AMOUNT / 2);
+
+        // Calculate total bet amount for user1 across all outcomes
+        uint256 user1TotalBet = BET_AMOUNT;
+
+        // Place bet from user2
+        vm.prank(user2);
+        prediction.placeBet(TEST_MATCH_ID, 1, BET_AMOUNT);
+
+        // Record balances before closing
+        uint256 user1BalanceBefore = token.balanceOf(user1);
+        uint256 user2BalanceBefore = token.balanceOf(user2);
+
+        // Close the condition
+        vm.prank(oracle);
+        prediction.closeCondition(TEST_MATCH_ID);
+
+        // Verify condition is closed
+        assertTrue(prediction.isConditionClosed(TEST_MATCH_ID));
+
+        // Check if users can claim refunds
+        assertTrue(prediction.getRefundable(TEST_MATCH_ID, user1), "User1 should be able to claim refund");
+
+        // Claim refunds
+        vm.prank(user1);
+        prediction.claimRefund(TEST_MATCH_ID);
+
+        vm.prank(user2);
+        prediction.claimRefund(TEST_MATCH_ID);
+
+        // Verify users received their total bet amounts back
+        uint256 user1BalanceAfter = token.balanceOf(user1);
+        uint256 user2BalanceAfter = token.balanceOf(user2);
+        
+        assertEq(
+            user1BalanceAfter,
+            user1BalanceBefore + user1TotalBet,
+            "User1 should receive full refund for all bets across all outcomes"
+        );
+        
+        assertEq(
+            user2BalanceAfter,
+            user2BalanceBefore + BET_AMOUNT,
+            "User2 should receive full refund"
+        );
+
+        // Verify refund amounts
+        uint256 user1RefundAmount = prediction.getUserRefund(TEST_MATCH_ID, user1);
+        
+        assertEq(
+            user1RefundAmount,
+            user1TotalBet,
+            "User1 refund amount should match total bet amount across all outcomes"
+        );
+
+        // Verify users can't claim twice
+        vm.expectRevert();
+        vm.prank(user1);
+        prediction.claimRefund(TEST_MATCH_ID);
     }
 }
