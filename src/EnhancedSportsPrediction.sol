@@ -228,7 +228,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
     /// @param matchId The match identifier
     function closeCondition(bytes32 matchId) external onlyOracle {
         Condition storage condition = conditions[matchId];
-        if (condition.matchId == bytes32(0)) revert ConditionNotFound();
+        if (condition.endTime == 0) revert ConditionNotFound();
         if (condition.resolved) revert ConditionAlreadyResolved();
         if (condition.closed) revert ConditionClosed();
 
