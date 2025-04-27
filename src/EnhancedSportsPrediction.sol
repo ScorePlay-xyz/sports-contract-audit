@@ -303,10 +303,9 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         // Clear the user's outcomes array since all bets are refunded
         delete condition.userOutcomes[msg.sender];
 
-        bool success = collateralToken.transfer(msg.sender, totalUserBet);
-        if (!success) revert();
-
         emit BetRefunded(msg.sender, matchId, totalUserBet);
+
+        collateralToken.safeTransfer(msg.sender, totalUserBet);
     }
 
     /// @notice Calculates the current odds for a specific outcome
