@@ -37,10 +37,14 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
     error CurrentPeriodEnded();
     error BettingPeriodNotEnded();
     error AlreadyClaimed();
+    error ConditionClosed();
+    error ConditionNotClosed();
+    error NoBetsToRefund();
 
     struct Condition {
         bytes32 matchId;
         bool resolved;
+        bool closed; // Closed without resolution
         uint256 winningOutcome;
         uint256 totalPool;
         uint256 endTime;
@@ -51,6 +55,9 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         mapping(address => mapping(uint256 => uint256)) userBets;
         mapping(address => bool) hasClaimed;
         mapping(address => uint256) claimedAmounts;
+        mapping(address => bool) hasRefunded;
+        mapping(address => uint256) refundedAmounts;
+        mapping(address => uint256[]) userOutcomes; // Store outcomes each user has bet on
     }
 
     mapping(bytes32 => Condition) public conditions;
@@ -83,6 +90,12 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         bytes32 indexed matchId,
         uint256 oldEndTime,
         uint256 newEndTime
+    );
+    event ConditionClosedForRefund(bytes32 indexed matchId);
+    event BetRefunded(
+        address indexed user,
+        bytes32 indexed matchId,
+        uint256 amount
     );
 
     modifier onlyOracle() {
@@ -145,10 +158,16 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         Condition storage condition = conditions[matchId];
         if (condition.endTime == 0) revert ConditionNotFound();
         if (condition.resolved) revert ConditionAlreadyResolved();
+        if (condition.closed) revert ConditionClosed();
         if (block.timestamp >= condition.endTime) revert BettingPeriodEnded();
         if (amount == 0) revert InvalidBetAmount();
         if (outcome < condition.minOutcome || outcome > condition.maxOutcome)
             revert InvalidOutcome();
+
+        // Check if this is the first time the user is betting on this outcome
+        if (condition.userBets[msg.sender][outcome] == 0) {
+            condition.userOutcomes[msg.sender].push(outcome);
+        }
 
         condition.outcomeBets[outcome] += amount;
         condition.userBets[msg.sender][outcome] += amount;
@@ -184,6 +203,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         if (condition.endTime == 0) revert ConditionNotFound();
         if (condition.resolved) revert ConditionAlreadyResolved();
         if (block.timestamp < condition.endTime) revert BettingPeriodNotEnded();
+        if (condition.closed) revert ConditionClosed();
 
         condition.resolved = true;
         condition.winningOutcome = winningOutcome;
@@ -202,6 +222,19 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
 
         emit ConditionResolved(matchId, winningOutcome);
         emit HouseFeeCollected(matchId, houseCut);
+    }
+
+    /// @notice Closes a condition without declaring a winner (e.g., match canceled)
+    /// @param matchId The match identifier
+    function closeCondition(bytes32 matchId) external onlyOracle {
+        Condition storage condition = conditions[matchId];
+        if (condition.endTime == 0) revert ConditionNotFound();
+        if (condition.resolved) revert ConditionAlreadyResolved();
+        if (condition.closed) revert ConditionClosed();
+
+        condition.closed = true;
+
+        emit ConditionClosedForRefund(matchId);
     }
 
     /// @notice Allows a user to claim their winnings
@@ -240,6 +273,39 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         emit PayoutClaimed(msg.sender, matchId, payout);
 
         collateralToken.safeTransfer(msg.sender, payout);
+    }
+
+    /// @notice Allows a user to claim a refund for their bets on a closed condition
+    /// @param matchId The match identifier
+    function claimRefund(bytes32 matchId) external nonReentrant {
+        Condition storage condition = conditions[matchId];
+        if (!condition.closed) revert ConditionNotClosed();
+        if (condition.hasRefunded[msg.sender]) revert AlreadyClaimed();
+
+        uint256 totalUserBet = 0;
+        uint256[] storage userOutcomes = condition.userOutcomes[msg.sender];
+
+        // Only loop through outcomes the user has actually bet on
+        for (uint256 i = 0; i < userOutcomes.length; i++) {
+            uint256 outcome = userOutcomes[i];
+            totalUserBet += condition.userBets[msg.sender][outcome];
+
+            // Clear the user's bets as they are being refunded
+            condition.userBets[msg.sender][outcome] = 0;
+        }
+
+        if (totalUserBet == 0) revert NoBetsToRefund();
+
+        // Mark as refunded before transfer to prevent reentrancy
+        condition.hasRefunded[msg.sender] = true;
+        condition.refundedAmounts[msg.sender] = totalUserBet;
+
+        // Clear the user's outcomes array since all bets are refunded
+        delete condition.userOutcomes[msg.sender];
+
+        emit BetRefunded(msg.sender, matchId, totalUserBet);
+
+        collateralToken.safeTransfer(msg.sender, totalUserBet);
     }
 
     /// @notice Calculates the current odds for a specific outcome
@@ -307,6 +373,7 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         if (condition.endTime == 0) revert ConditionNotFound();
         if (condition.resolved) revert ConditionAlreadyResolved();
         if (block.timestamp >= condition.endTime) revert CurrentPeriodEnded();
+        if (condition.closed) revert ConditionClosed();
         if (newEndTime <= block.timestamp) revert BettingPeriodEnded();
 
         uint256 oldEndTime = condition.endTime;
@@ -419,6 +486,23 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
 
     // Keep the original functions but mark them as deprecated
     /// @notice Get all matches a user has participated in (deprecated - use paginated version)
+    /// @notice Checks if a user can claim a refund for a given match
+    /// @param matchId The match identifier
+    /// @param user The user address
+    /// @return Whether the user can claim a refund
+    function getRefundable(
+        bytes32 matchId,
+        address user
+    ) external view returns (bool) {
+        Condition storage condition = conditions[matchId];
+
+        if (!condition.closed) return false;
+        if (condition.hasRefunded[user]) return false;
+
+        return condition.userOutcomes[user].length > 0;
+    }
+
+    /// @notice Get all matches a user has participated in
     /// @param user The user address
     /// @return Array of matchIds the user has bet on
     function getUserMatches(
@@ -458,6 +542,17 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         return conditions[matchId].claimedAmounts[user];
     }
 
+    /// @notice Returns the refunded amount for a user in a given match
+    /// @param matchId The match identifier
+    /// @param user The address of the user
+    /// @return The amount refunded to the user
+    function getUserRefund(
+        bytes32 matchId,
+        address user
+    ) external view returns (uint256) {
+        return conditions[matchId].refundedAmounts[user];
+    }
+
     /// @notice Get the claim status and amount for a user
     /// @param matchId The match identifier
     /// @param user The user address
@@ -475,5 +570,11 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
     /// @return The total betting volume
     function getTotalBettingVolume() external view returns (uint256) {
         return totalBettingVolume;
+    }
+    /// @notice Check if a condition has been closed without resolution
+    /// @param matchId The match identifier
+    /// @return Whether the condition has been closed
+    function isConditionClosed(bytes32 matchId) external view returns (bool) {
+        return conditions[matchId].closed;
     }
 }
