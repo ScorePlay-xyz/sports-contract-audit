@@ -209,7 +209,6 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
 
         uint256 houseCut = (condition.totalPool * condition.houseFee) /
             FEE_DENOMINATOR;
-        totalFeesCollected += houseCut;
         uint256 winningPool = condition.outcomeBets[winningOutcome];
 
         // If no one bet on the winning outcome, add remaining funds to house fees
