@@ -203,6 +203,10 @@ contract EnhancedSportsPrediction is Ownable, ReentrancyGuard {
         if (condition.resolved) revert ConditionAlreadyResolved();
         if (block.timestamp < condition.endTime) revert BettingPeriodNotEnded();
         if (condition.closed) revert ConditionClosed();
+        if (
+            winningOutcome < condition.minOutcome ||
+            winningOutcome > condition.maxOutcome
+        ) revert InvalidOutcome();
 
         condition.resolved = true;
         condition.winningOutcome = winningOutcome;
